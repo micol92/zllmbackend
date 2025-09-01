@@ -1,0 +1,24 @@
+
+@server = http://localhost:4004
+@me = Authorization: Basic alice:
+
+# (send that three times to get out-of-stock message)
+GET {{server}}/odata/v4/chat/getChatRagResponse
+Content-Type: application/json
+{{me}}
+
+{
+    "conversationId": "cv100",
+    "messageId": "mid100",
+     "message_time": "2025-05-17T14:30:30+09:00",
+    "user_id": "alice",
+    "user_query": "ABAP AI Cost?"
+}
+
+
+###
+POST {{server}}/odata/v4/catalog/insActBooks200
+Content-Type: application/json
+{{me}}
+
+{ "ID":202, "title":"206_title", "stock":500 }
