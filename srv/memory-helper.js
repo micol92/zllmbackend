@@ -99,14 +99,15 @@ async function handleMemoryBeforeRagCall(conversationId, messageId, message_time
 }
 
 // Helper method to handle conversation memory in HANA CLoud after RAG LLM call.
-async function handleMemoryAfterRagCall(conversationId, message_time, chatRagResponse, Message, Conversation) {
+async function handleMemoryAfterRagCall(conversationId, message_time, chatRagResponse, Message, Conversation, fileName) {
     try {
         const aiMessageRecord = {
             "cID_cID": conversationId,
             "mID": uuidv4(),
             "role": chatRagResponse.role,
             "content": chatRagResponse.content,
-            "creation_time": message_time
+            "creation_time": message_time,
+            "fileName": fileName
         };
 
         // Insert the assistant message to db

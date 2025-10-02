@@ -97,6 +97,7 @@ response: {
 
 `;
 
+
 const hrRequestPrompt =
     `You are a chatbot. Answer the user question based on the following information
 1. HR policy, delimited by triple backticks. \n 
@@ -226,7 +227,7 @@ module.exports = function () {
             console.log("====>>>>>[getChatRagResponse] req.data.user_id :" + user_id);
             console.log("====>>>>>[getChatRagResponse] req.data.user_query :" + user_query);
 
-            
+
             let hrLeavePrompt = "";
 
             let determinationPayload = [{
@@ -275,43 +276,12 @@ module.exports = function () {
 
             // 여기서 한 번 정리
             const safeContext = sanitizeContext(memoryContext);
-
-            /*Single method to perform the following :
-            - Embed the input query
-            - Perform similarity search based on the user query 
-            - Construct the prompt based on the system instruction and similarity search
-            - Call chat completion model to retrieve relevant answer to the user query
-            */
-
             const promptCategory = {
                 "leave-request-query": hrLeavePrompt,
                 "generic-query": genericRequestPrompt
             }
-            /*
-                        const chatRagResponse = await vectorplugin.getRagResponse(
-                            user_query,
-                            tableName,
-                            embeddingColumn,
-                            contentColumn,
-                            promptCategory[category] ,
-                            memoryContext .length > 0 ? memoryContext : undefined,
-                            30
-                        );
-            */
+
             console.log("====>>>>>zzzzzzz run getRagResponseWithConfig :");
-            /*
-                        const chatRagResponse = await vectorplugin.getRagResponseWithConfig(
-                            user_query,
-                            tableName,
-                            embeddingColumn,
-                            contentColumn,
-                            promptCategory[category],
-                            embeddingConfig,
-                            chatConfig,
-                            memoryContext.length > 0 ? memoryContext : undefined,
-                            30,
-                        );
-            */
             console.log("====>>>>>zzzzzzz run safeContext :" + safeContext);
 
 
@@ -326,59 +296,60 @@ module.exports = function () {
                 safeContext.length > 0 ? safeContext : undefined,
                 30
             );
+
             console.log("[RAG raw completion preview]:",
                 JSON.stringify(chatRagResponse?.completion)?.slice(0, 10000));
-           // console.log("[RAG raw completion preview2]:",
-            //    JSON.stringify(chatRagResponse?.completion));
-            //handle memory after the RAG LLM call
-            /*
+
+            // 1) 모델 원시 응답에서 텍스트 추출
+            let fileName = null;
+
+            const assistantText = extractAssistantText(chatRagResponse.completion, "gpt"); // gpt/claude/gemini에 맞게 힌트 가능
+
+            console.log("====>>>>>nnn assistantText :", assistantText);
+
+            if (!assistantText) {
+                console.error("[RAG] No assistant text. Raw (truncated):",
+                    JSON.stringify(chatRagResponse.completion)?.slice(0, 2000));
+                throw new Error("LLM returned no text content for RAG response.");
+            }
+
+            // 2) 메모리에도 '텍스트'만 저장 (원시 전체 응답 저장 X)
             const responseTimestamp = new Date().toISOString();
-            await handleMemoryAfterRagCall(conversationId, responseTimestamp, chatRagResponse.completion, Message, Conversation);
+            console.log("FILENAME::::>>>", chatRagResponse.additionalContents[0]?.METADATA_COLUMN.toString())
+            console.log("FILENAME::::>>>", chatRagResponse.additionalContents[0]?.SCORE.toString())
 
-            console.log("====>>>>>nnn addtionConts :", chatRagResponse.additionalContents);
-            const response = {
-                "role": chatRagResponse.completion.role,
-                "content": chatRagResponse.completion.content,
-                "messageTime": responseTimestamp,
-                "additionalContents": chatRagResponse.additionalContents,
+            // assistantText에 특정 문구가 있으면 fileName 강제로 "N/A"
+            if (chatRagResponse.additionalContents[0]?.SCORE < 0.8 ) {
+                fileName = "N/A";
+            } else {
+                fileName = JSON.parse(chatRagResponse.additionalContents[0]?.METADATA_COLUMN.toString())[0].fileName;
+            }
+            await handleMemoryAfterRagCall(
+                conversationId,
+                responseTimestamp,
+                { role: "assistant", content: assistantText }, // 여기!
+                Message,
+                Conversation,
+                fileName
+               // JSON.parse(chatRagResponse.additionalContents[0]?.METADATA_COLUMN.toString())[0].fileName
+            );
+
+            // 3) 클라이언트로도 role/content를 표준 형태로 내려주기
+            //console.log("====>>>>>nnn addtionConts :", chatRagResponse.additionalContents);
+            const aAdditionalContents = [];
+            chatRagResponse.additionalContents.forEach(element => {
+                aAdditionalContents.push({
+                    //file_name: JSON.parse(element.METADATA_COLUMN.toString())[0].fileName,
+                    file_name: fileName,
+                    page_content: element.PAGE_CONTENT
+                })
+            });
+            return {
+                role: "assistant",
+                content: assistantText,
+                messageTime: responseTimestamp,
+                additionalContents: aAdditionalContents,
             };
-            return response;
-
-            */
-
-           
-
-            /* 0825.for citation을 위해서. original part */
-            
-                        // 1) 모델 원시 응답에서 텍스트 추출
-                        const assistantText = extractAssistantText(chatRagResponse.completion, "gpt"); // gpt/claude/gemini에 맞게 힌트 가능
-            
-                        console.log("====>>>>>nnn assistantText :", assistantText);
-
-                        if (!assistantText) {
-                            console.error("[RAG] No assistant text. Raw (truncated):",
-                                JSON.stringify(chatRagResponse.completion)?.slice(0, 2000));
-                            throw new Error("LLM returned no text content for RAG response.");
-                        }
-            
-                        // 2) 메모리에도 '텍스트'만 저장 (원시 전체 응답 저장 X)
-                        const responseTimestamp = new Date().toISOString();
-                        await handleMemoryAfterRagCall(
-                            conversationId,
-                            responseTimestamp,
-                            { role: "assistant", content: assistantText }, // 여기!
-                            Message,
-                            Conversation
-                        );
-            
-                        // 3) 클라이언트로도 role/content를 표준 형태로 내려주기
-                        console.log("====>>>>>nnn addtionConts :", chatRagResponse.additionalContents);
-                        return {
-                            role: "assistant",
-                            content: assistantText,
-                            messageTime: responseTimestamp,
-                            additionalContents: chatRagResponse.additionalContents ?? [],
-                        };
 
         }
         catch (error) {

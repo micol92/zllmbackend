@@ -22,6 +22,7 @@ entity Message {
     role: String;
     content: LargeString;
     creation_time: Timestamp;
+    fileName: String;
 }
 
 entity DocumentChunk
